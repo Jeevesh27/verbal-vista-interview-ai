@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Camera, CameraOff, MessageSquare, Send, Users, Settings, Phone, PhoneOff } from 'lucide-react';
+import { Mic, MicOff, Camera, CameraOff, MessageSquare, Send, Users, Settings, Phone, PhoneOff, Volume2 } from 'lucide-react';
 import CameraVideo from './CameraVideo';
 import AudioRecorder from './AudioRecorder';
 import TextToSpeech from './TextToSpeech';
@@ -16,6 +16,8 @@ const Interview = () => {
   const [conversationHistory, setConversationHistory] = useState([]);
   const [chatMessage, setChatMessage] = useState('');
   const [showChat, setShowChat] = useState(true);
+  const [isAISpeaking, setIsAISpeaking] = useState(false);
+  const [isUserSpeaking, setIsUserSpeaking] = useState(false);
 
   const audioRecorderRef = useRef();
   const textToSpeechRef = useRef();
@@ -34,6 +36,7 @@ const Interview = () => {
     const welcomeMessage = "Welcome to your AI interview. Please introduce yourself and tell me your name.";
     setCurrentQuestion(welcomeMessage);
     
+    setIsAISpeaking(true);
     if (textToSpeechRef.current) {
       textToSpeechRef.current.speak(welcomeMessage);
     }
@@ -45,6 +48,8 @@ const Interview = () => {
     setIsInterviewActive(false);
     setIsCameraOn(false);
     setIsMicOn(false);
+    setIsAISpeaking(false);
+    setIsUserSpeaking(false);
     if (textToSpeechRef.current) {
       textToSpeechRef.current.stop();
     }
@@ -54,6 +59,7 @@ const Interview = () => {
     if (!userText.trim()) return;
 
     setIsLoading(true);
+    setIsUserSpeaking(false);
     
     setConversationHistory(prev => [...prev, { 
       type: 'user', 
@@ -85,6 +91,7 @@ const Interview = () => {
           timestamp: new Date() 
         }]);
 
+        setIsAISpeaking(true);
         if (textToSpeechRef.current) {
           textToSpeechRef.current.speak(aiQuestion);
         }
@@ -94,6 +101,7 @@ const Interview = () => {
       const errorMessage = "I'm sorry, there was an error processing your response. Please try again.";
       setCurrentQuestion(errorMessage);
       
+      setIsAISpeaking(true);
       if (textToSpeechRef.current) {
         textToSpeechRef.current.speak(errorMessage);
       }
@@ -121,26 +129,41 @@ const Interview = () => {
     }
   };
 
+  // Handle TTS events
+  useEffect(() => {
+    const handleSpeechStart = () => setIsAISpeaking(true);
+    const handleSpeechEnd = () => setIsAISpeaking(false);
+
+    if (textToSpeechRef.current) {
+      textToSpeechRef.current.onSpeechStart = handleSpeechStart;
+      textToSpeechRef.current.onSpeechEnd = handleSpeechEnd;
+    }
+  }, []);
+
   return (
-    <div className="h-screen bg-gray-50 flex flex-col">
+    <div className="h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+      <div className="bg-white/90 backdrop-blur-sm border-b border-slate-200/50 px-6 py-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center space-x-4">
-          <h1 className="text-xl font-medium text-gray-900">AI Interview</h1>
-          <div className="hidden md:flex items-center space-x-2 text-sm text-gray-600">
-            <Users size={16} />
-            <span>Interview Session</span>
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+              <span className="text-white text-sm font-semibold">AI</span>
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold text-slate-800">AI Interview Session</h1>
+              <p className="text-sm text-slate-500">Professional Assessment</p>
+            </div>
           </div>
         </div>
         
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-3">
           <button
             onClick={() => setShowChat(!showChat)}
-            className="lg:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+            className="lg:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-all duration-200"
           >
             <MessageSquare size={20} />
           </button>
-          <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg">
+          <button className="p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-all duration-200">
             <Settings size={20} />
           </button>
         </div>
@@ -148,33 +171,68 @@ const Interview = () => {
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Video Section */}
-        <div className="flex-1 flex flex-col">
-          {/* Video Grid */}
-          <div className="flex-1 bg-gray-900 p-4 flex items-center justify-center">
-            <div className="max-w-4xl w-full">
-              <div className="bg-gray-800 rounded-lg overflow-hidden shadow-2xl">
+        {/* Left Side - Video Section */}
+        <div className="flex-1 lg:flex-none lg:w-2/3 flex flex-col">
+          {/* Video Container */}
+          <div className="flex-1 p-6 flex items-center justify-center">
+            <div className="w-full max-w-3xl">
+              <div className="relative bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200/50">
                 <CameraVideo isActive={isCameraOn} />
+                
+                {/* Speaking Indicator Overlay */}
+                {(isUserSpeaking || isAISpeaking) && (
+                  <div className="absolute top-4 left-4">
+                    <div className={`flex items-center space-x-2 px-3 py-2 rounded-full ${
+                      isUserSpeaking 
+                        ? 'bg-green-500/90 text-white' 
+                        : 'bg-blue-500/90 text-white'
+                    } backdrop-blur-sm animate-pulse`}>
+                      <div className="flex space-x-1">
+                        <div className="w-1 h-3 bg-white rounded-full animate-bounce"></div>
+                        <div className="w-1 h-3 bg-white rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                        <div className="w-1 h-3 bg-white rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                      </div>
+                      <span className="text-sm font-medium">
+                        {isUserSpeaking ? 'You are speaking' : 'AI is speaking'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Participant Label */}
+                <div className="absolute bottom-4 left-4">
+                  <div className="bg-black/70 text-white px-3 py-1 rounded-lg text-sm font-medium backdrop-blur-sm">
+                    You
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Current Question Bar */}
+          {/* Current Question Section */}
           {isInterviewActive && (
-            <div className="bg-blue-50 border-t border-blue-200 p-4">
-              <div className="max-w-4xl mx-auto">
-                <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-                    <span className="text-white text-sm font-medium">AI</span>
+            <div className="bg-white/80 backdrop-blur-sm border-t border-slate-200/50 p-6">
+              <div className="max-w-3xl mx-auto">
+                <div className="flex items-start space-x-4">
+                  <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                    isAISpeaking 
+                      ? 'bg-gradient-to-r from-blue-500 to-indigo-600 animate-pulse' 
+                      : 'bg-gradient-to-r from-blue-500 to-indigo-600'
+                  }`}>
+                    {isAISpeaking ? (
+                      <Volume2 className="text-white" size={20} />
+                    ) : (
+                      <span className="text-white text-sm font-semibold">AI</span>
+                    )}
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 bg-white rounded-xl p-4 shadow-sm border border-slate-200/50">
                     {isLoading ? (
-                      <div className="flex items-center space-x-2 text-blue-600">
-                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
+                      <div className="flex items-center space-x-3 text-slate-600">
+                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent"></div>
                         <span>Processing your response...</span>
                       </div>
                     ) : (
-                      <p className="text-gray-800">{currentQuestion}</p>
+                      <p className="text-slate-800 leading-relaxed">{currentQuestion}</p>
                     )}
                   </div>
                 </div>
@@ -183,93 +241,101 @@ const Interview = () => {
           )}
 
           {/* Controls Bar */}
-          <div className="bg-white border-t border-gray-200 p-4">
+          <div className="bg-white/90 backdrop-blur-sm border-t border-slate-200/50 p-6">
             <div className="flex items-center justify-center space-x-4">
               <button
                 onClick={() => setIsMicOn(!isMicOn)}
-                className={`p-3 rounded-full transition-colors ${
+                className={`p-4 rounded-full transition-all duration-300 transform hover:scale-105 ${
                   isMicOn 
-                    ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' 
-                    : 'bg-red-500 text-white hover:bg-red-600'
+                    ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 shadow-md' 
+                    : 'bg-red-500 text-white hover:bg-red-600 shadow-lg'
                 }`}
               >
-                {isMicOn ? <Mic size={20} /> : <MicOff size={20} />}
+                {isMicOn ? <Mic size={22} /> : <MicOff size={22} />}
               </button>
               
               <button
                 onClick={() => setIsCameraOn(!isCameraOn)}
-                className={`p-3 rounded-full transition-colors ${
+                className={`p-4 rounded-full transition-all duration-300 transform hover:scale-105 ${
                   isCameraOn 
-                    ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' 
-                    : 'bg-red-500 text-white hover:bg-red-600'
+                    ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 shadow-md' 
+                    : 'bg-red-500 text-white hover:bg-red-600 shadow-lg'
                 }`}
               >
-                {isCameraOn ? <Camera size={20} /> : <CameraOff size={20} />}
+                {isCameraOn ? <Camera size={22} /> : <CameraOff size={22} />}
               </button>
 
               {!isInterviewActive ? (
                 <button
                   onClick={startInterview}
-                  className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-full font-medium transition-colors"
+                  className="px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-full font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg"
                 >
                   Join Interview
                 </button>
               ) : (
                 <button
                   onClick={endInterview}
-                  className="p-3 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors"
+                  className="p-4 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg"
                 >
-                  <PhoneOff size={20} />
+                  <PhoneOff size={22} />
                 </button>
               )}
             </div>
           </div>
         </div>
 
-        {/* Chat Sidebar */}
-        <div className={`${showChat ? 'block' : 'hidden'} lg:block w-full lg:w-80 bg-white border-l border-gray-200 flex flex-col`}>
+        {/* Right Side - Chat Section */}
+        <div className={`${showChat ? 'block' : 'hidden'} lg:block w-full lg:w-1/3 bg-white/90 backdrop-blur-sm border-l border-slate-200/50 flex flex-col`}>
           {/* Chat Header */}
-          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-            <h3 className="font-medium text-gray-900">Interview Chat</h3>
+          <div className="p-6 border-b border-slate-200/50 flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <MessageSquare size={16} className="text-white" />
+              </div>
+              <h3 className="font-semibold text-slate-800">Interview Chat</h3>
+            </div>
             <button
               onClick={() => setShowChat(false)}
-              className="lg:hidden text-gray-500 hover:text-gray-700"
+              className="lg:hidden text-slate-500 hover:text-slate-700 transition-colors"
             >
               ✕
             </button>
           </div>
 
           {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {conversationHistory.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">
-                <MessageSquare size={48} className="mx-auto mb-4 text-gray-300" />
-                <p>Interview conversation will appear here</p>
+              <div className="text-center text-slate-500 py-12">
+                <div className="w-16 h-16 bg-gradient-to-r from-slate-200 to-slate-300 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <MessageSquare size={24} className="text-slate-400" />
+                </div>
+                <p className="text-lg font-medium mb-2">Ready to start</p>
+                <p className="text-sm">Your conversation will appear here</p>
               </div>
             ) : (
               conversationHistory.map((item, index) => (
                 <div
                   key={index}
-                  className={`flex ${item.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${item.type === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}
                 >
                   <div
-                    className={`max-w-xs lg:max-w-sm px-3 py-2 rounded-lg ${
+                    className={`max-w-xs lg:max-w-sm px-4 py-3 rounded-2xl shadow-sm transition-all duration-300 ${
                       item.type === 'ai'
-                        ? 'bg-gray-100 text-gray-800'
+                        ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-slate-800 border border-blue-100'
                         : item.type === 'user'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-green-100 text-green-800'
+                        ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white'
+                        : 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-800 border border-green-100'
                     }`}
                   >
                     <div className="flex items-center space-x-2 mb-1">
-                      <span className="text-xs font-medium">
+                      <span className="text-xs font-semibold opacity-90">
                         {item.type === 'ai' ? 'AI Interviewer' : item.type === 'user' ? 'You' : 'Chat'}
                       </span>
                       <span className="text-xs opacity-70">
                         {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
-                    <p className="text-sm">{item.message}</p>
+                    <p className="text-sm leading-relaxed">{item.message}</p>
                   </div>
                 </div>
               ))
@@ -278,20 +344,20 @@ const Interview = () => {
           </div>
 
           {/* Chat Input */}
-          <div className="p-4 border-t border-gray-200">
-            <div className="flex space-x-2">
+          <div className="p-6 border-t border-slate-200/50">
+            <div className="flex space-x-3">
               <input
                 type="text"
                 value={chatMessage}
                 onChange={(e) => setChatMessage(e.target.value)}
                 onKeyPress={handleChatKeyPress}
                 placeholder="Type a message..."
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                className="flex-1 px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white/80 backdrop-blur-sm transition-all duration-200"
               />
               <button
                 onClick={sendChatMessage}
                 disabled={!chatMessage.trim()}
-                className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105"
               >
                 <Send size={16} />
               </button>
@@ -307,6 +373,7 @@ const Interview = () => {
             ref={audioRecorderRef}
             isActive={isMicOn && isInterviewActive}
             onTranscription={handleUserResponse}
+            onSpeakingChange={setIsUserSpeaking}
           />
         </div>
       )}

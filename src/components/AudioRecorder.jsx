@@ -1,13 +1,13 @@
-
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { Mic, MicOff } from 'lucide-react';
 
-const AudioRecorder = forwardRef(({ isActive, onTranscription }, ref) => {
+const AudioRecorder = forwardRef(({ isActive, onTranscription, onSpeakingChange }, ref) => {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState(null);
   const recognitionRef = useRef();
   const timeoutRef = useRef();
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   useImperativeHandle(ref, () => ({
     startListening,
@@ -26,6 +26,13 @@ const AudioRecorder = forwardRef(({ isActive, onTranscription }, ref) => {
       stopListening();
     };
   }, [isActive]);
+
+  // Notify parent about speaking state
+  useEffect(() => {
+    if (onSpeakingChange) {
+      onSpeakingChange(isSpeaking);
+    }
+  }, [isSpeaking, onSpeakingChange]);
 
   const initializeSpeechRecognition = () => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -48,6 +55,7 @@ const AudioRecorder = forwardRef(({ isActive, onTranscription }, ref) => {
     recognitionRef.current.onresult = (event) => {
       let finalTranscript = '';
       let interimTranscript = '';
+      let hasSpeech = false;
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
@@ -55,9 +63,12 @@ const AudioRecorder = forwardRef(({ isActive, onTranscription }, ref) => {
           finalTranscript += transcript;
         } else {
           interimTranscript += transcript;
+          hasSpeech = true;
         }
       }
 
+      // Update speaking state based on interim results
+      setIsSpeaking(hasSpeech || interimTranscript.length > 0);
       setTranscript(finalTranscript + interimTranscript);
 
       // If we have a final result, send it and reset
@@ -67,6 +78,7 @@ const AudioRecorder = forwardRef(({ isActive, onTranscription }, ref) => {
           if (finalTranscript.trim()) {
             onTranscription(finalTranscript.trim());
             setTranscript('');
+            setIsSpeaking(false);
           }
         }, 1000); // Wait 1 second after final result before sending
       }
@@ -76,10 +88,12 @@ const AudioRecorder = forwardRef(({ isActive, onTranscription }, ref) => {
       console.error('Speech recognition error:', event.error);
       setError(`Speech recognition error: ${event.error}`);
       setIsListening(false);
+      setIsSpeaking(false);
     };
 
     recognitionRef.current.onend = () => {
       setIsListening(false);
+      setIsSpeaking(false);
       // Restart if still active
       if (isActive) {
         setTimeout(() => {
@@ -108,6 +122,7 @@ const AudioRecorder = forwardRef(({ isActive, onTranscription }, ref) => {
     clearTimeout(timeoutRef.current);
     setIsListening(false);
     setTranscript('');
+    setIsSpeaking(false);
   };
 
   if (error) {
